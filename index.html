@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultrasound Image Evaluation Survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0f;
+    --surface: #141418;
+    --surface2: #1c1c22;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e6e0;
+    --muted: #888880;
+    --accent: #4ade91;
+    --accent-dim: rgba(74,222,145,0.12);
+    --accent-border: rgba(74,222,145,0.3);
+    --real: #60a5fa;
+    --real-dim: rgba(96,165,250,0.12);
+    --synth: #f472b6;
+    --synth-dim: rgba(244,114,182,0.12);
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --r: 10px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 2rem 1.5rem;
+    position: sticky;
+    top: 0;
+    background: rgba(12,12,15,0.96);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.3rem;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .logo span { color: var(--accent); font-style: italic; }
+
+  .progress-wrap {
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .btn-export {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-export:hover { border-color: var(--accent-border); color: var(--accent); }
+
+  /* ── INTRO ── */
+  #intro {
+    max-width: 680px;
+    margin: 4rem auto;
+    padding: 0 2rem;
+  }
+
+  #intro h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 400;
+    line-height: 1.15;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+  }
+
+  #intro h1 em { color: var(--accent); font-style: italic; }
+
+  #intro p {
+    color: var(--muted);
+    margin-bottom: 1rem;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1rem;
+    margin: 2rem 0;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-real { background: var(--real); }
+  .dot-synth { background: var(--synth); }
+  .dot-accent { background: var(--accent); }
+
+  .rating-legend {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.25rem;
+    margin: 1.5rem 0;
+  }
+
+  .rating-legend h3 {
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .rating-scale {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .scale-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+
+  .scale-num {
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .btn-start {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2rem;
+    padding: 14px 28px;
+    background: var(--accent);
+    color: #0c0c0f;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-start:hover { background: #6ee8a8; transform: translateY(-1px); }
+
+  /* ── LOADING ── */
+  #loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 1.5rem;
+  }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ── SURVEY ── */
+  #survey {
+    display: none;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .survey-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+  }
+
+  .nav-counter {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .nav-counter strong {
+    color: var(--text);
+    font-size: 1.1em;
+  }
+
+  .btn-prev, .btn-next {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+
+  .btn-prev:hover, .btn-next:hover {
+    background: var(--surface2);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  .btn-prev:disabled, .btn-next:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .btn-next.primary {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+  .btn-next.primary:hover { background: rgba(74,222,145,0.2); }
+
+  /* ── IMAGE CARD ── */
+  .image-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    transition: border-color 0.3s;
+  }
+
+  .image-card.answered { border-color: var(--accent-border); }
+
+  .img-container {
+    position: relative;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+  }
+
+  .survey-img {
+    max-width: 100%;
+    max-height: 420px;
+    width: 100%;
+    object-fit: contain;
+    display: block;
+    transition: opacity 0.3s;
+  }
+
+  .img-loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .img-error {
+    padding: 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .img-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    border: 1px solid var(--border2);
+    background: rgba(12,12,15,0.85);
+    color: var(--muted);
+    backdrop-filter: blur(8px);
+  }
+
+  /* ── QUESTION PANELS ── */
+  .questions {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .question-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.25rem;
+  }
+
+  .q-label {
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* Real / Synthetic toggle */
+  .type-toggle {
+    display: flex;
+    gap: 8px;
+  }
+
+  .type-btn {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .type-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  .type-btn.selected-real {
+    background: var(--real-dim);
+    border-color: var(--real);
+    color: var(--real);
+  }
+
+  .type-btn.selected-synth {
+    background: var(--synth-dim);
+    border-color: var(--synth);
+    color: var(--synth);
+  }
+
+  /* Star rating */
+  .star-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .star-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex: 1;
+    min-width: 48px;
+  }
+
+  .star-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  .star-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .star-label {
+    font-size: 10px;
+    text-align: center;
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .star-btn.selected {
+    border-color: var(--warn);
+    background: rgba(251,191,36,0.1);
+    color: var(--warn);
+  }
+
+  /* ── COMPLETION ── */
+  #completion {
+    display: none;
+    max-width: 640px;
+    margin: 4rem auto;
+    padding: 0 2rem;
+    text-align: center;
+  }
+
+  .done-icon {
+    width: 64px; height: 64px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 2rem;
+    font-size: 28px;
+  }
+
+  #completion h2 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 2.2rem;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+
+  #completion p { color: var(--muted); margin-bottom: 0.75rem; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 2.5rem 0;
+  }
+
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.25rem 1rem;
+  }
+
+  .stat-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 2rem;
+    font-weight: 500;
+    display: block;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 28px;
+    background: var(--accent);
+    color: #0c0c0f;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0.5rem;
+    transition: all 0.2s;
+  }
+  .btn-download:hover { background: #6ee8a8; }
+
+  .btn-restart {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 28px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0.5rem;
+    transition: all 0.2s;
+  }
+  .btn-restart:hover { background: var(--surface2); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    transition: transform 0.3s;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 500px) {
+    .star-row { gap: 4px; }
+    .star-btn { padding: 8px 8px; min-width: 40px; }
+    .star-num { font-size: 16px; }
+    .star-label { font-size: 9px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Sono<span>eval</span></div>
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="prog-label">0 / 100 images rated</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+  </div>
+  <button class="btn-export" onclick="exportCSV()" title="Download responses so far">↓ Export CSV</button>
+</header>
+
+<!-- INTRO -->
+<section id="intro">
+  <h1>Rate these<br><em>ultrasound</em> images.</h1>
+  <p>You will be shown 100 ultrasound images drawn from a dataset that includes both real clinical scans and synthetically generated images. Your task is twofold for each image:</p>
+  <p>1. Judge whether the image appears <strong>Real</strong> or <strong>Synthetic</strong>.<br>
+     2. Rate its clinical image quality on a 1–5 scale.</p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot dot-real"></div> Real — authentic clinical scan</div>
+    <div class="legend-item"><div class="dot dot-synth"></div> Synthetic — AI-generated</div>
+    <div class="legend-item"><div class="dot dot-accent"></div> Your progress is auto-saved</div>
+  </div>
+
+  <div class="rating-legend">
+    <h3>Quality scale</h3>
+    <div class="rating-scale">
+      <div class="scale-item"><span class="scale-num">1</span> Poor — undiagnosable</div>
+      <div class="scale-item"><span class="scale-num">2</span> Below average</div>
+      <div class="scale-item"><span class="scale-num">3</span> Adequate</div>
+      <div class="scale-item"><span class="scale-num">4</span> Good</div>
+      <div class="scale-item"><span class="scale-num">5</span> Excellent clinical quality</div>
+    </div>
+  </div>
+
+  <button class="btn-start" onclick="startSurvey()">Begin evaluation →</button>
+</section>
+
+<!-- LOADING -->
+<section id="loading">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Fetching images from dataset…</div>
+</section>
+
+<!-- SURVEY -->
+<section id="survey">
+  <div class="survey-nav">
+    <button class="btn-prev" onclick="navigate(-1)" id="btn-prev">← Prev</button>
+    <div class="nav-counter">Image <strong id="cur-idx">1</strong> of <strong>100</strong></div>
+    <button class="btn-next primary" onclick="navigate(1)" id="btn-next">Next →</button>
+  </div>
+
+  <div class="image-card" id="image-card">
+    <div class="img-container" id="img-container">
+      <div class="img-loading-overlay" id="img-overlay"><div class="spinner"></div></div>
+      <img id="survey-img" class="survey-img" src="" alt="Ultrasound image" style="opacity:0">
+      <div class="img-badge" id="img-badge">#—</div>
+    </div>
+  </div>
+
+  <div class="questions">
+    <div class="question-panel">
+      <div class="q-label">Q1 — Is this image real or synthetic?</div>
+      <div class="type-toggle">
+        <button class="type-btn" id="btn-real" onclick="setType('real')">
+          <span style="font-size:18px">🩺</span> Real
+        </button>
+        <button class="type-btn" id="btn-synth" onclick="setType('synthetic')">
+          <span style="font-size:18px">🤖</span> Synthetic
+        </button>
+      </div>
+    </div>
+
+    <div class="question-panel">
+      <div class="q-label">Q2 — Rate clinical image quality (1 = poor, 5 = excellent)</div>
+      <div class="star-row">
+        <button class="star-btn" onclick="setQuality(1)"><span class="star-num" id="sq1">1</span><span class="star-label">Poor</span></button>
+        <button class="star-btn" onclick="setQuality(2)"><span class="star-num" id="sq2">2</span><span class="star-label">Below avg</span></button>
+        <button class="star-btn" onclick="setQuality(3)"><span class="star-num" id="sq3">3</span><span class="star-label">Adequate</span></button>
+        <button class="star-btn" onclick="setQuality(4)"><span class="star-num" id="sq4">4</span><span class="star-label">Good</span></button>
+        <button class="star-btn" onclick="setQuality(5)"><span class="star-num" id="sq5">5</span><span class="star-label">Excellent</span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPLETION -->
+<section id="completion">
+  <div class="done-icon">✓</div>
+  <h2>Evaluation complete.</h2>
+  <p>Thank you for rating all 100 ultrasound images.</p>
+  <p>Your responses are ready to download as a CSV file.</p>
+  <div class="stats-grid">
+    <div class="stat-box"><span class="stat-num" id="stat-total">100</span><span class="stat-label">Images rated</span></div>
+    <div class="stat-box"><span class="stat-num" id="stat-real">—</span><span class="stat-label">Classified real</span></div>
+    <div class="stat-box"><span class="stat-num" id="stat-avg">—</span><span class="stat-label">Avg quality</span></div>
+  </div>
+  <button class="btn-download" onclick="downloadCSV()">⬇ Download results CSV</button>
+  <button class="btn-restart" onclick="location.reload()">↺ Start over</button>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DATASET = 'harveymannering/ultrasound_images_diffusion';
+const TOTAL = 100;
+const POOL_SIZE = 30000;
+
+let imageIndices = [];
+let responses = {};
+let currentIdx = 0;
+let imageData = [];
+let loadedUrls = {};
+
+function seededShuffle(arr, seed) {
+  let s = seed;
+  function rand() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  }
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function pickIndices() {
+  let pool = Array.from({length: POOL_SIZE}, (_, i) => i);
+  seededShuffle(pool, 20250515);
+  return pool.slice(0, TOTAL);
+}
+
+async function fetchBatch(indices) {
+  const results = [];
+  const batchSize = 10;
+  for (let i = 0; i < indices.length; i += batchSize) {
+    const batch = indices.slice(i, i + batchSize);
+    const promises = batch.map(idx =>
+      fetch(`https://datasets-server.huggingface.co/rows?dataset=${DATASET}&config=default&split=train&offset=${idx}&length=1`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.rows && d.rows[0]) {
+            return { idx, url: d.rows[0].row.image.src };
+          }
+          return { idx, url: null };
+        })
+        .catch(() => ({ idx, url: null }))
+    );
+    const batch_results = await Promise.all(promises);
+    results.push(...batch_results);
+    document.getElementById('loading-msg').textContent =
+      `Fetching images… ${Math.min(i + batchSize, indices.length)} / ${indices.length}`;
+    await new Promise(r => setTimeout(r, 80));
+  }
+  return results;
+}
+
+async function startSurvey() {
+  document.getElementById('intro').style.display = 'none';
+  const loadEl = document.getElementById('loading');
+  loadEl.style.display = 'flex';
+
+  imageIndices = pickIndices();
+
+  try {
+    const fetched = await fetchBatch(imageIndices);
+    imageData = imageIndices.map((origIdx, i) => {
+      const found = fetched.find(f => f.idx === origIdx);
+      return { origIdx, url: found ? found.url : null };
+    });
+  } catch(e) {
+    imageData = imageIndices.map(origIdx => ({ origIdx, url: null }));
+  }
+
+  loadEl.style.display = 'none';
+  document.getElementById('survey').style.display = 'block';
+  renderImage(0);
+}
+
+function renderImage(n) {
+  currentIdx = n;
+  const data = imageData[n];
+  const img = document.getElementById('survey-img');
+  const overlay = document.getElementById('img-overlay');
+  const badge = document.getElementById('img-badge');
+
+  document.getElementById('cur-idx').textContent = n + 1;
+  badge.textContent = `#${data.origIdx}`;
+
+  img.style.opacity = 0;
+  overlay.style.display = 'flex';
+
+  if (data.url) {
+    img.onload = () => {
+      overlay.style.display = 'none';
+      img.style.opacity = 1;
+    };
+    img.onerror = () => {
+      overlay.innerHTML = '<div class="img-error">⚠ Image unavailable</div>';
+    };
+    img.src = data.url;
+  } else {
+    overlay.innerHTML = '<div class="img-error">⚠ Could not load image</div>';
+  }
+
+  const resp = responses[n] || {};
+  updateTypeUI(resp.type || null);
+  updateQualityUI(resp.quality || null);
+  updateAnsweredState(n);
+  updateProgress();
+  updateNav();
+}
+
+function setType(val) {
+  if (!responses[currentIdx]) responses[currentIdx] = {};
+  responses[currentIdx].type = val;
+  responses[currentIdx].origIdx = imageData[currentIdx].origIdx;
+  updateTypeUI(val);
+  updateAnsweredState(currentIdx);
+  updateProgress();
+  saveLocal();
+}
+
+function setQuality(val) {
+  if (!responses[currentIdx]) responses[currentIdx] = {};
+  responses[currentIdx].quality = val;
+  responses[currentIdx].origIdx = imageData[currentIdx].origIdx;
+  updateQualityUI(val);
+  updateAnsweredState(currentIdx);
+  updateProgress();
+  saveLocal();
+
+  const bothAnswered = responses[currentIdx].type && responses[currentIdx].quality;
+  if (bothAnswered && currentIdx < TOTAL - 1) {
+    setTimeout(() => navigate(1), 400);
+  } else if (bothAnswered && currentIdx === TOTAL - 1) {
+    const allDone = Array.from({length: TOTAL}, (_, i) => i)
+      .every(i => responses[i] && responses[i].type && responses[i].quality);
+    if (allDone) setTimeout(showCompletion, 600);
+  }
+}
+
+function updateTypeUI(val) {
+  const realBtn = document.getElementById('btn-real');
+  const synthBtn = document.getElementById('btn-synth');
+  realBtn.className = 'type-btn' + (val === 'real' ? ' selected-real' : '');
+  synthBtn.className = 'type-btn' + (val === 'synthetic' ? ' selected-synth' : '');
+}
+
+function updateQualityUI(val) {
+  for (let i = 1; i <= 5; i++) {
+    const btn = document.getElementById('sq' + i).parentElement;
+    btn.className = 'star-btn' + (val === i ? ' selected' : '');
+  }
+}
+
+function updateAnsweredState(n) {
+  const resp = responses[n];
+  const card = document.getElementById('image-card');
+  const answered = resp && resp.type && resp.quality;
+  card.className = 'image-card' + (answered ? ' answered' : '');
+}
+
+function updateProgress() {
+  const done = Object.values(responses).filter(r => r && r.type && r.quality).length;
+  const pct = Math.round((done / TOTAL) * 100);
+  document.getElementById('prog-label').textContent = `${done} / ${TOTAL} images rated`;
+  document.getElementById('prog-pct').textContent = `${pct}%`;
+  document.getElementById('prog-fill').style.width = pct + '%';
+}
+
+function updateNav() {
+  document.getElementById('btn-prev').disabled = currentIdx === 0;
+  const isLast = currentIdx === TOTAL - 1;
+  const nextBtn = document.getElementById('btn-next');
+  nextBtn.textContent = isLast ? 'Finish ✓' : 'Next →';
+  if (isLast) {
+    nextBtn.onclick = () => {
+      const allDone = Array.from({length: TOTAL}, (_, i) => i)
+        .every(i => responses[i] && responses[i].type && responses[i].quality);
+      if (allDone) showCompletion();
+      else showToast('Please answer all 100 images before finishing.');
+    };
+  } else {
+    nextBtn.onclick = () => navigate(1);
+  }
+}
+
+function navigate(dir) {
+  const next = currentIdx + dir;
+  if (next < 0 || next >= TOTAL) return;
+  renderImage(next);
+}
+
+function showCompletion() {
+  document.getElementById('survey').style.display = 'none';
+  document.getElementById('completion').style.display = 'block';
+
+  const vals = Object.values(responses);
+  const realCount = vals.filter(r => r.type === 'real').length;
+  const avgQ = vals.reduce((s, r) => s + (r.quality || 0), 0) / vals.length;
+
+  document.getElementById('stat-real').textContent = realCount;
+  document.getElementById('stat-avg').textContent = avgQ.toFixed(1);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function getCSVRows() {
+  const header = 'image_number,dataset_index,classification,quality_rating\n';
+  const rows = Array.from({length: TOTAL}, (_, i) => {
+    const r = responses[i] || {};
+    return `${i + 1},${imageData[i] ? imageData[i].origIdx : ''},${r.type || ''},${r.quality || ''}`;
+  }).join('\n');
+  return header + rows;
+}
+
+function downloadCSV() {
+  const csv = getCSVRows();
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ultrasound_survey_results.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV() {
+  const done = Object.values(responses).filter(r => r && r.type && r.quality).length;
+  if (done === 0) { showToast('No responses yet to export.'); return; }
+  downloadCSV();
+  showToast(`Exported ${done} responses.`);
+}
+
+function saveLocal() {
+  try {
+    localStorage.setItem('sonoeval_responses', JSON.stringify(responses));
+    localStorage.setItem('sonoeval_indices', JSON.stringify(imageIndices));
+  } catch(e) {}
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
