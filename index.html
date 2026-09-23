@@ -722,9 +722,21 @@ function seededShuffle(arr, seed) {
   return arr;
 }
 
+// Generates a fresh random seed each time the page runs, so the shuffle
+// (and therefore which 100 images get picked, and their order) is
+// different on every visit instead of always landing on the same set.
+function randomSeed() {
+  if (window.crypto && window.crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    return arr[0];
+  }
+  return Math.floor(Math.random() * 0xffffffff);
+}
+
 function pickIndices() {
   let pool = Array.from({length: POOL_SIZE}, (_, i) => i);
-  seededShuffle(pool, 20250515);
+  seededShuffle(pool, randomSeed());
   return pool.slice(0, TOTAL);
 }
 
