@@ -622,7 +622,7 @@
 <!-- INTRO -->
 <section id="intro">
   <h1>Rate these<br><em>ultrasound</em> images.</h1>
-  <p>You will be shown 100 ultrasound images drawn from a dataset that includes both real clinical scans and synthetically generated images. Your task is twofold for each image:</p>
+  <p>You will be shown <span id="intro-total">120</span> ultrasound images, sampled 20 at random from each fetal plane class, drawn from a dataset that includes both real clinical scans and synthetically generated images. Your task is twofold for each image:</p>
   <p>1. Judge whether the image appears <strong>Real</strong> or <strong>Synthetic</strong>.<br>
      2. Rate its clinical image quality on a 1–5 scale.</p>
 
@@ -656,7 +656,7 @@
 <section id="survey">
   <div class="survey-nav">
     <button class="btn-prev" onclick="navigate(-1)" id="btn-prev">← Prev</button>
-    <div class="nav-counter">Image <strong id="cur-idx">1</strong> of <strong>100</strong></div>
+    <div class="nav-counter">Image <strong id="cur-idx">1</strong> of <strong id="total-count">100</strong></div>
     <button class="btn-next primary" onclick="navigate(1)" id="btn-next">Next →</button>
   </div>
 
@@ -698,7 +698,7 @@
 <section id="completion">
   <div class="done-icon">✓</div>
   <h2>Evaluation complete.</h2>
-  <p>Thank you for rating all 100 ultrasound images.</p>
+  <p>Thank you for rating all the ultrasound images.</p>
   <p>Your responses are ready to download as a CSV file.</p>
   <div class="stats-grid">
     <div class="stat-box"><span class="stat-num" id="stat-total">100</span><span class="stat-label">Images rated</span></div>
@@ -713,8 +713,8 @@
 
 <script>
 const DATASET = 'harveymannering/ultrasound_images_diffusion';
-const TOTAL = 100;
 const POOL_SIZE = 30000;
+const CLASS_QUOTA = 20; // images to collect per plane class
 
 const PLANE_CLASSES = {
   0: 'Other',
@@ -724,6 +724,14 @@ const PLANE_CLASSES = {
   4: 'Fetal femur',
   5: 'Fetal thorax',
 };
+
+const CLASS_KEYS = Object.keys(PLANE_CLASSES).map(Number);
+let TOTAL = CLASS_QUOTA * CLASS_KEYS.length; // e.g. 20 * 6 classes = 120; finalized after sampling
+
+(function initIntroTotal() {
+  const el = document.getElementById('intro-total');
+  if (el) el.textContent = TOTAL;
+})();
 
 let imageIndices = [];
 let responses = {};
@@ -745,8 +753,7 @@ function seededShuffle(arr, seed) {
 }
 
 // Generates a fresh random seed each time the page runs, so the shuffle
-// (and therefore which 100 images get picked, and their order) is
-// different on every visit instead of always landing on the same set.
+// order is different on every visit instead of always landing on the same set.
 function randomSeed() {
   if (window.crypto && window.crypto.getRandomValues) {
     const arr = new Uint32Array(1);
@@ -754,12 +761,6 @@ function randomSeed() {
     return arr[0];
   }
   return Math.floor(Math.random() * 0xffffffff);
-}
-
-function pickIndices() {
-  let pool = Array.from({length: POOL_SIZE}, (_, i) => i);
-  seededShuffle(pool, randomSeed());
-  return pool.slice(0, TOTAL);
 }
 
 // Dataset rows may expose the plane-class field under slightly different
@@ -777,31 +778,103 @@ function extractLabel(row) {
   return null;
 }
 
-async function fetchBatch(indices) {
-  const results = [];
-  const batchSize = 10;
-  for (let i = 0; i < indices.length; i += batchSize) {
-    const batch = indices.slice(i, i + batchSize);
-    const promises = batch.map(idx =>
-      fetch(`https://datasets-server.huggingface.co/rows?dataset=${DATASET}&config=default&split=train&offset=${idx}&length=1`)
-        .then(r => r.json())
-        .then(d => {
-          if (d.rows && d.rows[0]) {
-            const row = d.rows[0].row;
-            const label = extractLabel(row);
-            return { idx, url: row.image.src, label };
-          }
-          return { idx, url: null, label: null };
-        })
-        .catch(() => ({ idx, url: null, label: null }))
-    );
-    const batch_results = await Promise.all(promises);
-    results.push(...batch_results);
+async function fetchOne(idx) {
+  try {
+    const res = await fetch(`https://datasets-server.huggingface.co/rows?dataset=${DATASET}&config=default&split=train&offset=${idx}&length=1`);
+    const d = await res.json();
+    if (d.rows && d.rows[0]) {
+      const row = d.rows[0].row;
+      return { idx, url: row.image ? row.image.src : null, label: extractLabel(row) };
+    }
+  } catch (e) { /* ignore, treated as a miss below */ }
+  return { idx, url: null, label: null };
+}
+
+// POOL_SIZE was a guessed upper bound. Ask the datasets-server for the real
+// row count so the shuffled pool doesn't waste attempts on offsets past the
+// end of the dataset (which come back empty and previously ate into the
+// attempt budget for no reason).
+async function getDatasetSize() {
+  try {
+    const res = await fetch(`https://datasets-server.huggingface.co/size?dataset=${DATASET}`);
+    const d = await res.json();
+    const split = d?.size?.splits?.find(s => s.config === 'default' && s.split === 'train');
+    if (split && split.num_rows) return split.num_rows;
+  } catch (e) { /* fall through to the guessed size below */ }
+  return POOL_SIZE;
+}
+
+// Walks a shuffled pool of dataset offsets, fetching them in small batches and
+// sorting each hit into its plane-class bucket until every class reaches
+// CLASS_QUOTA (or we run out of pool / attempts). The combined result is then
+// reshuffled so classes are interleaved in random order for the survey.
+async function buildStratifiedSample() {
+  const datasetSize = await getDatasetSize();
+  let pool = Array.from({length: datasetSize}, (_, i) => i);
+  seededShuffle(pool, randomSeed());
+
+  const buckets = {};
+  CLASS_KEYS.forEach(k => buckets[k] = []);
+  const targetTotal = CLASS_QUOTA * CLASS_KEYS.length;
+  const BATCH = 10;
+  // Generous budget: even a class that's rare in the source dataset (some
+  // plane classes are far less common than others) gets a real chance to
+  // fill its quota instead of the scan cutting off early.
+  const MAX_ATTEMPTS = Math.min(pool.length, Math.max(targetTotal * 30, 1500));
+
+  let filled = 0;
+  let attempted = 0;
+  let cursor = 0;
+  let sawAnyLabel = false;
+
+  while (filled < targetTotal && cursor < pool.length && attempted < MAX_ATTEMPTS) {
+    const batchIdxs = pool.slice(cursor, cursor + BATCH);
+    cursor += BATCH;
+    const results = await Promise.all(batchIdxs.map(fetchOne));
+    attempted += batchIdxs.length;
+
+    for (const r of results) {
+      if (!r.url) continue;
+      if (r.label !== null) sawAnyLabel = true;
+      if (r.label !== null && buckets[r.label] && buckets[r.label].length < CLASS_QUOTA) {
+        buckets[r.label].push(r);
+        filled++;
+      }
+    }
+
     document.getElementById('loading-msg').textContent =
-      `Fetching images… ${Math.min(i + batchSize, indices.length)} / ${indices.length}`;
-    await new Promise(r => setTimeout(r, 80));
+      `Sampling ${filled} / ${targetTotal} images across ${CLASS_KEYS.length} plane classes… (checked ${attempted})`;
+    await new Promise(r => setTimeout(r, 60));
   }
-  return results;
+
+  // Fallback: label field couldn't be detected at all (dataset schema mismatch) —
+  // don't leave the survey empty, just fall back to a plain random sample.
+  if (!sawAnyLabel && filled === 0) {
+    document.getElementById('loading-msg').textContent = 'Could not detect plane labels — falling back to a plain random sample…';
+    const fallback = [];
+    let idx2 = 0;
+    while (fallback.length < targetTotal && idx2 < pool.length) {
+      const batchIdxs = pool.slice(idx2, idx2 + BATCH);
+      idx2 += BATCH;
+      const results = await Promise.all(batchIdxs.map(fetchOne));
+      for (const r of results) {
+        if (r.url && fallback.length < targetTotal) fallback.push(r);
+      }
+    }
+    return { combined: seededShuffle(fallback, randomSeed()), buckets: null };
+  }
+
+  const combined = seededShuffle(CLASS_KEYS.flatMap(k => buckets[k]), randomSeed());
+  return { combined, buckets };
+}
+
+// Updates the "of N" / "N images" text scattered through the static HTML
+// to match the actual number of images once sampling has finished.
+function syncTotalDisplays() {
+  const navTotal = document.getElementById('total-count');
+  if (navTotal) navTotal.textContent = TOTAL;
+  const statTotal = document.getElementById('stat-total');
+  if (statTotal) statTotal.textContent = TOTAL;
 }
 
 async function startSurvey() {
@@ -809,20 +882,23 @@ async function startSurvey() {
   const loadEl = document.getElementById('loading');
   loadEl.style.display = 'flex';
 
-  imageIndices = pickIndices();
+  const { combined, buckets } = await buildStratifiedSample();
+  imageData = combined.map(s => ({ origIdx: s.idx, url: s.url, label: s.label }));
+  imageIndices = imageData.map(d => d.origIdx);
+  TOTAL = imageData.length; // in case sampling came up short of the target
 
-  try {
-    const fetched = await fetchBatch(imageIndices);
-    imageData = imageIndices.map((origIdx, i) => {
-      const found = fetched.find(f => f.idx === origIdx);
-      return { origIdx, url: found ? found.url : null, label: found ? found.label : null };
-    });
-  } catch(e) {
-    imageData = imageIndices.map(origIdx => ({ origIdx, url: null, label: null }));
+  if (buckets) {
+    const short = CLASS_KEYS
+      .filter(k => buckets[k].length < CLASS_QUOTA)
+      .map(k => `${PLANE_CLASSES[k]} (${buckets[k].length}/${CLASS_QUOTA})`);
+    if (short.length) {
+      showToast(`Some classes came up short: ${short.join(', ')} — ${TOTAL}/${CLASS_QUOTA * CLASS_KEYS.length} total`);
+    }
   }
 
   loadEl.style.display = 'none';
   document.getElementById('survey').style.display = 'block';
+  syncTotalDisplays();
   renderImage(0);
 }
 
