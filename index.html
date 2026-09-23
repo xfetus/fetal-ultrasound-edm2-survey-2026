@@ -354,12 +354,25 @@
     right: 12px;
     font-family: 'DM Mono', monospace;
     font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 99px;
+    padding: 6px 10px;
+    border-radius: 10px;
     border: 1px solid var(--border2);
     background: rgba(12,12,15,0.85);
     color: var(--muted);
     backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    text-align: right;
+    line-height: 1.3;
+  }
+
+  .img-badge .badge-label {
+    color: var(--accent);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
   }
 
   /* ── QUESTION PANELS ── */
@@ -703,6 +716,15 @@ const DATASET = 'harveymannering/ultrasound_images_diffusion';
 const TOTAL = 100;
 const POOL_SIZE = 30000;
 
+const PLANE_CLASSES = {
+  0: 'Other',
+  1: 'Maternal cervix',
+  2: 'Fetal abdomen',
+  3: 'Fetal brain',
+  4: 'Fetal femur',
+  5: 'Fetal thorax',
+};
+
 let imageIndices = [];
 let responses = {};
 let currentIdx = 0;
@@ -740,6 +762,21 @@ function pickIndices() {
   return pool.slice(0, TOTAL);
 }
 
+// Dataset rows may expose the plane-class field under slightly different
+// names depending on how the dataset was built, so check the likely ones.
+function extractLabel(row) {
+  const candidates = ['label', 'plane_class', 'class', 'plane', 'category'];
+  for (const key of candidates) {
+    if (row[key] !== undefined && row[key] !== null) {
+      const val = typeof row[key] === 'object' ? row[key].id ?? row[key].label : row[key];
+      if (typeof val === 'number' || (typeof val === 'string' && val.trim() !== '' && !isNaN(val))) {
+        return Number(val);
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchBatch(indices) {
   const results = [];
   const batchSize = 10;
@@ -750,11 +787,13 @@ async function fetchBatch(indices) {
         .then(r => r.json())
         .then(d => {
           if (d.rows && d.rows[0]) {
-            return { idx, url: d.rows[0].row.image.src };
+            const row = d.rows[0].row;
+            const label = extractLabel(row);
+            return { idx, url: row.image.src, label };
           }
-          return { idx, url: null };
+          return { idx, url: null, label: null };
         })
-        .catch(() => ({ idx, url: null }))
+        .catch(() => ({ idx, url: null, label: null }))
     );
     const batch_results = await Promise.all(promises);
     results.push(...batch_results);
@@ -776,10 +815,10 @@ async function startSurvey() {
     const fetched = await fetchBatch(imageIndices);
     imageData = imageIndices.map((origIdx, i) => {
       const found = fetched.find(f => f.idx === origIdx);
-      return { origIdx, url: found ? found.url : null };
+      return { origIdx, url: found ? found.url : null, label: found ? found.label : null };
     });
   } catch(e) {
-    imageData = imageIndices.map(origIdx => ({ origIdx, url: null }));
+    imageData = imageIndices.map(origIdx => ({ origIdx, url: null, label: null }));
   }
 
   loadEl.style.display = 'none';
@@ -795,7 +834,10 @@ function renderImage(n) {
   const badge = document.getElementById('img-badge');
 
   document.getElementById('cur-idx').textContent = n + 1;
-  badge.textContent = `#${data.origIdx}`;
+  const planeName = PLANE_CLASSES[data.label];
+  badge.innerHTML = planeName
+    ? `<span>#${data.origIdx}</span><span class="badge-label">${planeName}</span>`
+    : `<span>#${data.origIdx}</span>`;
 
   img.style.opacity = 0;
   overlay.style.display = 'flex';
@@ -916,10 +958,12 @@ function showCompletion() {
 }
 
 function getCSVRows() {
-  const header = 'image_number,dataset_index,classification,quality_rating\n';
+  const header = 'image_number,dataset_index,plane_class,classification,quality_rating\n';
   const rows = Array.from({length: TOTAL}, (_, i) => {
     const r = responses[i] || {};
-    return `${i + 1},${imageData[i] ? imageData[i].origIdx : ''},${r.type || ''},${r.quality || ''}`;
+    const data = imageData[i];
+    const planeName = data && PLANE_CLASSES[data.label] ? PLANE_CLASSES[data.label] : '';
+    return `${i + 1},${data ? data.origIdx : ''},${planeName},${r.type || ''},${r.quality || ''}`;
   }).join('\n');
   return header + rows;
 }
