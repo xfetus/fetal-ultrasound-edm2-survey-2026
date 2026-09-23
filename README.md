@@ -56,7 +56,7 @@ source .venv/bin/activate #If needed, to activate the virtual environment
 
 ## Run scripts
 ```bash
-uv run python scripts/auc.py
+uv run python scripts/sim_analysis.py
 ```
 
 

@@ -1,5 +1,5 @@
 [project]
-name = "rater-auc"
+name = "analysis-survey"
 version = "0.1.0"
 description = "Compute and plot analysis for real vs synthetic discrimination"
 requires-python = ">=3.14"
@@ -8,3 +8,4 @@ dependencies = [
     "matplotlib>=3.11.2",
     "scikit-learn>=1.9.1",
 ]
+
