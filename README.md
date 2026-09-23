@@ -42,3 +42,24 @@ Responses can be downloaded as **CSV** or **JSON** at the end of the survey. Eac
 * Images are fetched live from the HuggingFace Datasets Server API — no images are bundled
 * Requires internet access to load images
 * Progress is auto-saved to localStorage so the session survives page refreshes
+
+# Scripts
+
+## Installation
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
+uv sync
+uv pip list --verbose #check versions
+source .venv/bin/activate #If needed, to activate the virtual environment
+```
+
+
+## Run scripts
+```bash
+uv run python scripts/auc.py
+```
+
+
+
+
+
