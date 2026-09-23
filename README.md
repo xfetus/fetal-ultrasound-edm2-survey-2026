@@ -6,7 +6,7 @@ A GitHub Pages survey for differentiating real vs. synthetic ultrasound images a
 
 ## How the survey works:
 
-100 images are sampled from the 30k dataset using a fixed seed (so every rater sees the same 100 images, reproducible for analysis)
+100 images are sampled from the 30k dataset using a random seed.
 Images are fetched live from the HuggingFace Datasets Server API at runtime — no need to host images yourself
 Labels are completely ignored — images are presented unlabelled and randomly shuffled
 For each image, raters answer:
